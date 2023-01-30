@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JSON deep decode</title>
     <link rel="icon" href="https://cdn.icon-icons.com/icons2/2248/PNG/512/code_json_icon_136758.png" type="image/x-icon">
+
     <link
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
         rel="stylesheet"
@@ -53,20 +54,21 @@
             crossorigin="anonymous"
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/json-formatter-js"></script>
 
     <script>
-        let counter = 0;
         const inputElement = document.getElementById('json-input');
         const errorElement = document.getElementById('error-container');
         const outputElement = document.getElementById('output-container');
+        let counter = 0;
+        let previousInputs = [];
 
         function decode() {
             const content = inputElement.value;
-            let parsed;
+            let parsedData;
 
             try {
-                // parsed = JSON.parse(content);
-                parsed = deepDecode(content);
+                parsedData = deepDecode(content);
             } catch (exception) {
                 errorElement.innerText = exception.message;
                 errorElement.hidden = false;
@@ -75,8 +77,10 @@
             }
 
             errorElement.hidden = true;
+            previousInputs[counter] = parsedData;
+            outputElement.prepend(getDecodedValueElement(parsedData, counter));
+            switchFormat(counter, true);
             counter++;
-            outputElement.prepend(getDecodedValueElement(parsed, counter));
         }
 
         function deepDecode(content, throwException = true) {
@@ -138,21 +142,67 @@
                     dateStyle: 'short',
                     timeStyle: 'medium',
                 }).format(new Date());
-            summary.innerText = `#${counter} @ ${datetimeText}`;
+            summary.innerHTML = `#${counter + 1} @ ${datetimeText}&nbsp;&nbsp;&nbsp; <span id="${getSwitchElementId(counter)}"></span>`;
 
-            const pre = document.createElement('pre');
-            pre.innerText = JSON.stringify(parsedData, null, 2);
+            const contentDiv = document.createElement('div');
+            contentDiv.id = getJsonContentElementId(counter);
 
             const details = document.createElement('details');
             details.open = true;
             details.append(summary);
-            details.append(pre);
+            details.append(contentDiv)
 
             const div = document.createElement('div');
             div.append(details);
             div.append(document.createElement('br'));
 
             return div;
+        }
+
+        /**
+         * @param {number} index
+         * @param {boolean} pretty
+         */
+        function switchFormat(index, pretty) {
+            const switchHtml =
+                `Switch to
+                <a
+                    href="#"
+                    onclick="switchFormat(${index}, ${!pretty})"
+                >${pretty ? 'plain text' : 'pretty'}</a>
+                format`;
+            const switchElement = document.getElementById(getSwitchElementId(index));
+            switchElement.innerHTML = switchHtml;
+
+            const jsonData = previousInputs[index];
+            let contentHtml;
+
+            if (pretty) {
+                const jsonFormatter = new JSONFormatter(jsonData, Infinity);
+                contentHtml = jsonFormatter.render();
+            } else {
+                contentHtml = document.createElement('pre');
+                contentHtml.innerText = JSON.stringify(jsonData, null, 2);
+            }
+
+            const contentElement = document.getElementById(getJsonContentElementId(index));
+            contentElement.replaceChildren(contentHtml);
+        }
+
+        /**
+         * @param {number} index
+         * @returns {string}
+         */
+        function getSwitchElementId(index) {
+            return `switch-${index}`;
+        }
+
+        /**
+         * @param {number} index
+         * @returns {string}
+         */
+        function getJsonContentElementId(index) {
+            return `json-content-${index}`;
         }
 
         /**
