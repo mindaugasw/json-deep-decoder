@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON deep decode</title>
+    <link rel="icon" href="https://cdn.icon-icons.com/icons2/2248/PNG/512/code_json_icon_136758.png" type="image/x-icon">
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+        integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD"
+        crossorigin="anonymous"
+    >
+    <style>
+        #input-container textarea {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <br>
+        <h1>JSON deep decode</h1>
+
+        <div id="input-container">
+            <textarea
+                id="json-input"
+                rows="8"
+                onkeydown="handleShortcut(event)"
+            ></textarea>
+            <div class="d-grid col-12 col-md-6 col-lg-4 col-xl-3">
+                <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    onclick="decode()"
+                >
+                    Decode
+                </button>
+            </div>
+        </div>
+
+        <br>
+        <div id="error-container" hidden class="alert alert-danger" role="alert">
+            A simple warning alert—check it out!
+        </div>
+
+        <div id="output-container"></div>
+    </div>
+
+    <script
+            src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-w76AqPfDkMBDXo30jS1Sgez6pr3x5MlQ1ZAGC+nuZB+EYdgRZgiwxhTBTkF7CXvN"
+            crossorigin="anonymous"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+
+    <script>
+        let counter = 0;
+        const inputElement = document.getElementById('json-input');
+        const errorElement = document.getElementById('error-container');
+        const outputElement = document.getElementById('output-container');
+
+        function decode() {
+            const content = inputElement.value;
+            let parsed;
+
+            try {
+                // parsed = JSON.parse(content);
+                parsed = deepDecode(content);
+            } catch (exception) {
+                errorElement.innerText = exception.message;
+                errorElement.hidden = false;
+
+                return;
+            }
+
+            errorElement.hidden = true;
+            counter++;
+            outputElement.prepend(getDecodedValueElement(parsed, counter));
+        }
+
+        function deepDecode(content, throwException = true) {
+            let parsedData;
+
+            if (typeof content === 'string') {
+                try {
+                    parsedData = JSON.parse(content);
+                } catch (exception) {
+                    if (throwException) {
+                        throw exception;
+                    }
+
+                    return content;
+                }
+            } else {
+                parsedData = content;
+            }
+
+            // For whatever reason when this is directly inside switch(), it doesn't work
+            const type = typeof parsedData;
+
+            switch (true) {
+                case parsedData === null:
+                    return null;
+                case type === 'boolean':
+                case type === 'number':
+                case type === 'bigint':
+                    return parsedData;
+                case type === 'string':
+                    return parsedData === content
+                        ? parsedData
+                        : deepDecode(parsedData, false);
+                case Array.isArray(parsedData) && parsedData.length === 0:
+                    return [];
+                case type === 'object' && Object.keys(parsedData).length === 0:
+                    return {};
+            }
+
+            let deepParsedData = Array.isArray(parsedData) ? [] : {};
+
+            for (const [key, value] of Object.entries(parsedData)) {
+                deepParsedData[key] = deepDecode(value, false);
+            }
+
+            return deepParsedData;
+        }
+
+        /**
+         * @param {any} parsedData
+         * @param {number} counter
+         * @returns {HTMLDivElement}
+         */
+        function getDecodedValueElement(parsedData, counter) {
+            const summary = document.createElement('summary');
+            const datetimeText = new Intl.DateTimeFormat(
+                'lt-lt',
+                {
+                    dateStyle: 'short',
+                    timeStyle: 'medium',
+                }).format(new Date());
+            summary.innerText = `#${counter} @ ${datetimeText}`;
+
+            const pre = document.createElement('pre');
+            pre.innerText = JSON.stringify(parsedData, null, 2);
+
+            const details = document.createElement('details');
+            details.open = true;
+            details.append(summary);
+            details.append(pre);
+
+            const div = document.createElement('div');
+            div.append(details);
+            div.append(document.createElement('br'));
+
+            return div;
+        }
+
+        /**
+         * @param {KeyboardEvent} event
+         */
+        function handleShortcut(event) {
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                decode();
+            }
+        }
+
+        /**
+         * @param {boolean} print
+         */
+        function runUnitTests(print = true) {
+            const configuration = [
+                {
+                    input: 'null',
+                    expected: null,
+                },
+                {
+                    input: 'false',
+                    expected: false,
+                },
+                {
+                    input: 'true',
+                    expected: true,
+                },
+                {
+                    input: '0',
+                    expected: 0,
+                },
+                {
+                    input: '123',
+                    expected: 123,
+                },
+                {
+                    input: '""',
+                    expected: '',
+                },
+                {
+                    input: '"string"',
+                    expected: 'string',
+                },
+                {
+                    input: '[]',
+                    expected: [],
+                },
+                {
+                    input: '{}',
+                    expected: {},
+                },
+                {
+                    // Array with all data types
+                    input: '[null, false, true, 0, 123, "0", "", "string", [], {}]',
+                    expected: [null, false, true, 0, 123, 0, '', 'string', [], {}],
+                },
+                {
+                    // Simple object
+                    input: '{"a": "ok"}',
+                    expected: {a: 'ok'},
+                },
+                {
+                    // Simple JSON object as string
+                    input: '"{\\"a\\": \\"ok\\"}"',
+                    expected: {a: "ok"},
+                },
+                {
+                    // Nested JSON object as string
+                    input: '"{\\"b\\":\\"{\\\\\\"a\\\\\\":\\\\\\"ok\\\\\\"}\\"}"',
+                    expected: {
+                        b: {
+                            a: "ok",
+                        },
+                    },
+                },
+                {
+                    // Simple JSON array as string
+                    input: '"[\\"a\\"]"',
+                    expected: ['a'],
+                },
+                {
+                    // Nested JSON array as string
+                    input: '["[\\"a\\"]"]',
+                    expected: [['a']],
+                },
+            ];
+
+            let i = 0;
+            let errors = false;
+
+            for (const test of configuration) {
+                console.log(`#${i} input:`, test.input);
+                const actual = deepDecode(test.input);
+
+                if (_.isEqual(test.expected, actual)) {
+                    console.log(`#${i} OK:`, actual);
+                } else {
+                    errors = true;
+                    console.error(`#${i} Expected:`, test.expected);
+                    console.error(`#${i} Actual:`, actual);
+                }
+
+                if (print) {
+                    inputElement.value = test.input;
+                    decode();
+                }
+
+                i++;
+            }
+
+            if (errors) {
+                console.error('At least 1 test failed');
+            } else {
+                console.log('Tests completed successfully');
+            }
+        }
+    </script>
+</body>
+</html>
